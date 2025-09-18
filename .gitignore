@@ -11,3 +11,4 @@ orders.db
 .DS_Store
 Thumbs.db
 *.mp4
+!.env.example
