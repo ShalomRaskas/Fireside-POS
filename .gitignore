@@ -1,0 +1,13 @@
+﻿__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+.streamlit/
+.cache/
+orders.db
+*.sqlite
+.vscode/
+.DS_Store
+Thumbs.db
+*.mp4

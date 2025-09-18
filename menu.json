@@ -1,0 +1,70 @@
+﻿{
+  "categories": [
+    {
+      "name": "Pizzas",
+      "items": [
+        {
+          "id": "pz_margherita",
+          "name": "Margherita",
+          "base_price": 12.0,
+          "sizes": [
+            {"name": "Small 10\"", "price_delta": 0},
+            {"name": "Medium 12\"", "price_delta": 3},
+            {"name": "Large 16\"", "price_delta": 7}
+          ],
+          "available_toppings": [
+            {"name": "Pepperoni", "price_delta": 1.5},
+            {"name": "Mushrooms", "price_delta": 1.0},
+            {"name": "Onions", "price_delta": 0.75},
+            {"name": "Olives", "price_delta": 0.75},
+            {"name": "Extra Cheese", "price_delta": 1.5}
+          ]
+        },
+        {
+          "id": "pz_pepperoni",
+          "name": "Pepperoni",
+          "base_price": 13.0,
+          "sizes": [
+            {"name": "Small 10\"", "price_delta": 0},
+            {"name": "Medium 12\"", "price_delta": 3},
+            {"name": "Large 16\"", "price_delta": 7}
+          ],
+          "available_toppings": [
+            {"name": "Mushrooms", "price_delta": 1.0},
+            {"name": "Onions", "price_delta": 0.75},
+            {"name": "Olives", "price_delta": 0.75},
+            {"name": "Jalapeños", "price_delta": 1.0},
+            {"name": "Extra Cheese", "price_delta": 1.5}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sides",
+      "items": [
+        {
+          "id": "sd_garlic_knots",
+          "name": "Garlic Knots",
+          "base_price": 5.0,
+          "sizes": [],
+          "available_toppings": [{"name": "Marinara", "price_delta": 0.75}]
+        }
+      ]
+    },
+    {
+      "name": "Drinks",
+      "items": [
+        {
+          "id": "dr_soda",
+          "name": "Soda",
+          "base_price": 2.5,
+          "sizes": [
+            {"name": "Reg", "price_delta": 0},
+            {"name": "Lg", "price_delta": 0.75}
+          ],
+          "available_toppings": []
+        }
+      ]
+    }
+  ]
+}
