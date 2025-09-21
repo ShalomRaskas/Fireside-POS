@@ -368,7 +368,7 @@ def create_or_get_customer(con, name: str, phone: str):
     cur = con.cursor()
     if not phone:
         return None
-    cur.execute("SELECT id FROM customers WHERE phone=\n?", (phone,))
+    cur.execute("SELECT id FROM customers WHERE phone=?", (phone,))
     row = cur.fetchone()
     if row:
         return row[0]
@@ -706,7 +706,6 @@ def admin_ui():
                     success_url=f"{PUBLIC_BASE_URL}?checkout=success&order_id=TEST&session_id={{CHECKOUT_SESSION_ID}}",
                     cancel_url=f"{PUBLIC_BASE_URL}?checkout=canceled&order_id=TEST",
                 )
-            
                 trigger_checkout(sess.url)  # gets unique keys
             except Exception as e:
                 st.error(f"Failed to create test session: {e}")
@@ -764,6 +763,15 @@ def main():
     st.title(APP_NAME)
     st.caption("Single-file POS · Streamlit")
     st.caption(f"Stripe ready: {bool(stripe.api_key)} · key starts with: {(stripe.api_key or '')[:7]}")
+
+    # Quick demo links (added)
+    c1, c2 = st.columns(2)
+    app_url = PUBLIC_BASE_URL or "https://<your-app>.streamlit.app"
+    try:
+        c1.link_button("Manager (read-only)", f"{app_url}/?view=manager&readonly=1", use_container_width=True, key="demo_mgr_ro")
+        c2.link_button("Order (take payment)", f"{app_url}/?view=order", use_container_width=True, key="demo_order")
+    except Exception:
+        st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order)")
 
     init_state()
     init_db()
