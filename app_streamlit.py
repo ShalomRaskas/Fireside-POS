@@ -1,10 +1,9 @@
 # app_streamlit.py
 # Fresh single-file Streamlit POS (Order ▸ Kitchen ▸ Manager ▸ Admin)
-# - One checkout button: "Pay with Stripe"
-# - Verifies Checkout session on return (marks order Paid without webhooks)
-# - FIX: unique widget keys in checkout helper to avoid StreamlitDuplicateElementId
-# - menu.json & orders.db auto-create next to this file
-# - Works on Streamlit Cloud via st.secrets or locally via .env / env vars
+# - "Pay with Stripe" checkout; verifies on return (no webhook needed)
+# - Demo buttons at top (Manager RO / Order / Kitchen)
+# - Unique widget keys (no DuplicateElementId)
+# - Uses .env next to this file or Streamlit Secrets on cloud
 #
 # Quickstart (local):
 #   pip install streamlit pandas stripe python-dotenv
@@ -12,7 +11,7 @@
 #
 # Required secrets / env:
 #   STRIPE_SECRET_KEY = sk_test_...
-#   PUBLIC_BASE_URL   = https://<your-app-url>  (https://*.streamlit.app when deployed)
+#   PUBLIC_BASE_URL   = http://127.0.0.1:8502  (or your https streamlit.app url)
 
 from __future__ import annotations
 import json
@@ -22,15 +21,16 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+import hashlib
+from urllib.parse import urlsplit, urlunsplit
+
 import pandas as pd
 import streamlit as st
 from streamlit.components.v1 import html as st_html
-
-import stripe
-from urllib.parse import urlencode, urlsplit, urlunsplit
 from dotenv import load_dotenv
-import hashlib
+import stripe
 
+# ---------- Paths / .env ----------
 APP_DIR = Path(__file__).resolve().parent
 ENV_PATH = APP_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
@@ -46,9 +46,8 @@ DB_FILE = str(APP_DIR / "orders.db")
 # ---------- Secrets / ENV helpers ----------
 
 def _get_secret_env(name: str, default: str = "") -> str:
-    """Prefer Streamlit secrets; fallback to environment."""
     try:
-        v = st.secrets.get(name)  # type: ignore[attr-defined]
+        v = st.secrets.get(name)  # prefer Streamlit cloud secrets
         if v:
             return str(v).strip()
     except Exception:
@@ -57,15 +56,14 @@ def _get_secret_env(name: str, default: str = "") -> str:
 
 
 def _clean_base_url(url: str) -> str:
-    """Strip query/fragment and trailing slashes; keep scheme+host only."""
     if not url:
         return url
     parts = urlsplit(url.strip())
     if not parts.scheme or not parts.netloc:
-        return url
-    base = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
-    return base.rstrip("/")
+        return url.rstrip("/")
+    return urlunsplit((parts.scheme, parts.netloc, "", "", "")).rstrip("/")
 
+# Stripe globals
 STRIPE_ENABLED = True
 stripe.api_key = _get_secret_env("STRIPE_SECRET_KEY", "")
 PUBLIC_BASE_URL = _clean_base_url(_get_secret_env("PUBLIC_BASE_URL", "http://127.0.0.1:8502"))
@@ -167,7 +165,6 @@ def load_menu(path: str = MENU_FILE) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
-
 # ---------- Database ----------
 
 def get_conn():
@@ -232,7 +229,6 @@ def init_db():
     )
     con.commit(); con.close()
 
-
 # ---------- Pricing ----------
 
 def find_item(menu: Dict[str, Any], item_id: str) -> Optional[Dict[str, Any]]:
@@ -252,7 +248,8 @@ def calc_line_total(menu: Dict[str, Any], item_id: str, qty: int, size_name: Opt
     if size_name and it.get("sizes"):
         for s in it["sizes"]:
             if s["name"] == size_name:
-                size_delta = float(s.get("price_delta", 0)); break
+                size_delta = float(s.get("price_delta", 0))
+                break
     mods_total = sum(float(m.get("price_delta", 0)) for m in modifiers)
     return (base + size_delta + mods_total) * max(1, int(qty))
 
@@ -270,7 +267,6 @@ def calc_order_totals(subtotal: float, tax_rate: float, discount: float, deliver
         "total": total,
     }
 
-
 # ---------- State ----------
 
 def init_state():
@@ -279,7 +275,6 @@ def init_state():
     st.session_state.setdefault("tax_rate", DEFAULT_TAX_RATE)
     st.session_state.setdefault("delivery_fee", DEFAULT_DELIVERY_FEE)
     st.session_state.setdefault("pin", DEFAULT_PIN)
-
 
 # ---------- UI helpers ----------
 
@@ -361,7 +356,6 @@ def cart_summary_ui(menu: Dict[str, Any]) -> float:
     st.markdown(f"**Subtotal:** {money(subtotal)}")
     return subtotal
 
-
 # ---------- Stripe helpers ----------
 
 def create_or_get_customer(con, name: str, phone: str):
@@ -418,22 +412,16 @@ def create_checkout_for_order(order_id: int) -> Optional[str]:
 
 
 def trigger_checkout(url: str, key_suffix: Optional[str] = None):
-    """Open Checkout and render helper controls with unique widget keys."""
     ks = key_suffix or hashlib.sha1(url.encode("utf-8")).hexdigest()[:8]
     st.session_state["last_checkout_url"] = url
     open_in_new_tab(url)
-
     try:
         st.link_button("Open secure checkout", url, use_container_width=True, key=f"open_{ks}")
     except Exception:
-        st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order) · [Kitchen (KDS)]({app_url}/?view=kitchen)")
-")
-
+        st.markdown(f"[Open secure checkout]({url})")
     if st.button("Try popup again", key=f"retry_{ks}"):
         open_in_new_tab(url)
-
     st.info("If nothing opened, check your popup blocker.")
-
 
 # ---------- Order flow ----------
 
@@ -453,7 +441,7 @@ def place_order_ui(menu: Dict[str, Any]):
         customer_phone = cols[1].text_input("Phone (optional)")
 
         service_type = st.radio("Service type", SERVICE_TYPES, horizontal=True)
-        table_number = st.text_input("Table number (optional)" if service_type == "Dine-In" else "Table number (optional)") if service_type == "Dine-In" else None
+        table_number = st.text_input("Table number (optional)") if service_type == "Dine-In" else None
         delivery_fee = st.number_input("Delivery fee", 0.0, 99.0, float(st.session_state.delivery_fee)) if service_type == "Delivery" else 0.0
 
         st.divider()
@@ -475,7 +463,9 @@ def place_order_ui(menu: Dict[str, Any]):
             return
         con = get_conn(); cur = con.cursor()
         created_at = datetime.now().isoformat(timespec="seconds")
-        cust_id = create_or_get_customer(con, (customer_name or "").strip(), (customer_phone or "").strip()) if customer_phone else None
+        # Optional: create or update customer
+        if customer_phone:
+            _ = create_or_get_customer(con, (customer_name or "").strip(), (customer_phone or "").strip())
 
         cur.execute(
             """
@@ -527,7 +517,6 @@ def place_order_ui(menu: Dict[str, Any]):
         else:
             st.error("Stripe disabled or API key missing.")
 
-
 # ---------- Kitchen (KDS) ----------
 
 def kitchen_ui():
@@ -543,10 +532,7 @@ def kitchen_ui():
         with st.container(border=True):
             cols = st.columns([2,2,2,2,3])
             cols[0].markdown(f"**Order #{oid}**")
-            try:
-                cols[1].write(created_at)
-            except Exception:
-                cols[1].write(str(created_at))
+            cols[1].write(str(created_at))
             cols[2].write(service_type)
             cols[3].write(table_number or "-")
             cols[4].write(f"Status: **{status}**")
@@ -576,7 +562,6 @@ def kitchen_ui():
             if c2[2].button("Complete", key=f"done_{oid}"):
                 cur.execute("UPDATE orders SET status='completed' WHERE id=?", (oid,)); con.commit(); st.rerun()
     con.close()
-
 
 # ---------- Manager ----------
 
@@ -634,7 +619,7 @@ def manager_ui():
             if st.button("Create Stripe Checkout for Order ID above"):
                 url = create_checkout_for_order(int(oid))
                 if url:
-                    trigger_checkout(url)  # url-based key prevents duplicate id
+                    trigger_checkout(url)
                 else:
                     st.error("Could not create checkout (order not found or Stripe not configured).")
 
@@ -650,7 +635,6 @@ def manager_ui():
     colC.metric("Avg Ticket", money(avg_t))
 
     con.close()
-
 
 # ---------- Admin ----------
 
@@ -707,7 +691,7 @@ def admin_ui():
                     success_url=f"{PUBLIC_BASE_URL}?checkout=success&order_id=TEST&session_id={{CHECKOUT_SESSION_ID}}",
                     cancel_url=f"{PUBLIC_BASE_URL}?checkout=canceled&order_id=TEST",
                 )
-                trigger_checkout(sess.url)  # gets unique keys
+                trigger_checkout(sess.url)
             except Exception as e:
                 st.error(f"Failed to create test session: {e}")
 
@@ -722,7 +706,6 @@ def admin_ui():
             st.success("Menu saved.")
         except Exception as e:
             st.error(f"Invalid JSON: {e}")
-
 
 # ---------- Return banner + verification ----------
 
@@ -756,7 +739,6 @@ def init_banner():
         except Exception:
             pass
 
-
 # ---------- App ----------
 
 def main():
@@ -765,7 +747,7 @@ def main():
     st.caption("Single-file POS · Streamlit")
     st.caption(f"Stripe ready: {bool(stripe.api_key)} · key starts with: {(stripe.api_key or '')[:7]}")
 
-    # Quick demo links (added)
+    # Demo buttons (Manager RO / Order / Kitchen)
     c1, c2, c3 = st.columns(3)
     app_url = PUBLIC_BASE_URL or "https://<your-app>.streamlit.app"
     try:
@@ -773,14 +755,14 @@ def main():
         c2.link_button("Order (take payment)", f"{app_url}/?view=order", use_container_width=True, key="demo_order")
         c3.link_button("Kitchen (KDS)", f"{app_url}/?view=kitchen", use_container_width=True, key="demo_kitchen")
     except Exception:
-        st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order)")
+        st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order) · [Kitchen (KDS)]({app_url}/?view=kitchen)")
 
     init_state()
     init_db()
     menu = load_menu()
     init_banner()
 
-    # Presentation routing via query param: ?view=manager|kitchen|order|admin (&readonly=1)
+    # Route via query param: ?view=manager|kitchen|order|admin (&readonly=1)
     def _qp1(name):
         v = st.query_params.get(name)
         if isinstance(v, list):
@@ -788,10 +770,14 @@ def main():
         return v
     view = (_qp1("view") or "").lower()
     if view in {"manager","kitchen","order","admin"}:
-        if view == "manager": manager_ui(); return
-        if view == "kitchen": kitchen_ui(); return
-        if view == "order": place_order_ui(menu); return
-        if view == "admin": admin_ui(); return
+        if view == "manager":
+            manager_ui(); return
+        if view == "kitchen":
+            kitchen_ui(); return
+        if view == "order":
+            place_order_ui(menu); return
+        if view == "admin":
+            admin_ui(); return
 
     tabs = st.tabs(["Order", "Kitchen", "Manager", "Admin"])
     with tabs[0]:
