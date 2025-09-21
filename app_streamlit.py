@@ -359,7 +359,7 @@ def render_checkout_banner():
         if c2.button("Dismiss"):
             st.session_state.pop("checkout_url", None)
             st.session_state.pop("checkout_popup_attempted", None)
-            st.rerun()
+            st.experimental_rerun()
 
 
 def cart_summary_ui(menu: Dict[str, Any]):
@@ -387,7 +387,7 @@ def cart_summary_ui(menu: Dict[str, Any]):
                 line["line_total"] = calc_line_total(menu, line["item_id"], line["qty"], line.get("size"), line.get("modifiers", []))
             if cols[2].button("Remove", key=f"rm_{i}"):
                 st.session_state.cart.pop(i)
-                st.rerun()
+                st.experimental_rerun()
         total_sub += float(line["line_total"])
 
     st.markdown(f"**Subtotal:** {money(total_sub)}")
@@ -570,9 +570,11 @@ def place_order_ui(menu: Dict[str, Any]):
         totals = calc_order_totals(subtotal, tax_rate, discount, delivery_fee, tip)
         st.info(f"Total: {money(totals['total'])}  ·  Subtotal {money(totals['subtotal'])} · Tax {money(totals['tax'])}")
 
-        pay_and_submit = st.form_submit_button("Pay with Stripe", type="primary", use_container_width=True)
+        colb1, colb2 = st.columns(2)
+        submitted = colb1.form_submit_button("Place Order", use_container_width=True)
+        pay_and_submit = colb2.form_submit_button("Place & Pay with Stripe", type="primary", use_container_width=True)
 
-    if pay_and_submit:
+    if submitted or pay_and_submit:
         if not st.session_state.cart:
             st.error("Cart is empty.")
             return
@@ -709,11 +711,11 @@ def kitchen_ui():
 
             c2 = st.columns(3)
             if c2[0].button("Start", key=f"start_{oid}"):
-                cur.execute("UPDATE orders SET status='in_progress' WHERE id=?", (oid,)); con.commit(); st.rerun()
+                cur.execute("UPDATE orders SET status='in_progress' WHERE id=?", (oid,)); con.commit(); st.experimental_rerun()
             if c2[1].button("Ready", key=f"ready_{oid}"):
-                cur.execute("UPDATE orders SET status='ready' WHERE id=?", (oid,)); con.commit(); st.rerun()
+                cur.execute("UPDATE orders SET status='ready' WHERE id=?", (oid,)); con.commit(); st.experimental_rerun()
             if c2[2].button("Complete", key=f"done_{oid}"):
-                cur.execute("UPDATE orders SET status='completed' WHERE id=?", (oid,)); con.commit(); st.rerun()
+                cur.execute("UPDATE orders SET status='completed' WHERE id=?", (oid,)); con.commit(); st.experimental_rerun()
 
     con.close()
 
@@ -841,7 +843,7 @@ def admin_ui():
                 try:
                     st.rerun()
                 except Exception:
-                    st.rerun()
+                    st.experimental_rerun()
             else:
                 st.error("Wrong PIN.")
         st.stop()
