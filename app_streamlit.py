@@ -426,7 +426,8 @@ def trigger_checkout(url: str, key_suffix: Optional[str] = None):
     try:
         st.link_button("Open secure checkout", url, use_container_width=True, key=f"open_{ks}")
     except Exception:
-        st.markdown(f"[Open secure checkout]({url})")
+        st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order) · [Kitchen (KDS)]({app_url}/?view=kitchen)")
+")
 
     if st.button("Try popup again", key=f"retry_{ks}"):
         open_in_new_tab(url)
@@ -765,11 +766,12 @@ def main():
     st.caption(f"Stripe ready: {bool(stripe.api_key)} · key starts with: {(stripe.api_key or '')[:7]}")
 
     # Quick demo links (added)
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     app_url = PUBLIC_BASE_URL or "https://<your-app>.streamlit.app"
     try:
         c1.link_button("Manager (read-only)", f"{app_url}/?view=manager&readonly=1", use_container_width=True, key="demo_mgr_ro")
         c2.link_button("Order (take payment)", f"{app_url}/?view=order", use_container_width=True, key="demo_order")
+        c3.link_button("Kitchen (KDS)", f"{app_url}/?view=kitchen", use_container_width=True, key="demo_kitchen")
     except Exception:
         st.markdown(f"[Manager (read-only)]({app_url}/?view=manager&readonly=1) · [Order]({app_url}/?view=order)")
 
